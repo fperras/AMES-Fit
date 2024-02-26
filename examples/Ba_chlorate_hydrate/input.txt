@@ -1,0 +1,22 @@
+steps 1000
+max_steps 50000
+tries  64 ;multiple of processor threads
+spin  2.5
+
+spectrum   MAS    500   Ba_MAS_21.1.dat
+spectrum   static 500   Ba_static_21.1.dat
+spectrum   static 500   Ba_static_9.4.dat
+
+sites 1
+
+diso  1   20    0.3
+CQ   1   6.8   0.1
+eta   1   0.95  0.05
+span  1   20.0  20.0
+skew  1   0.0   1.0
+alpha 1   90.0  10.0
+beta  1   90.0  10.0
+gamma 1   0.0  90.0 
+
+GB    1   800    100
+LB    1   0.0    0.0
