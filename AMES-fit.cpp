@@ -21,6 +21,7 @@ int main(int argc, char *argv[]) {
     float rate = 0.5, S=1.5;
     vector<int> TD;
     vector<int> MAS;
+    vector<int> sat;
     vector<float> vs;
     vector<vector<float> > bin(nspec, vector<float>(1, 0.));
     vector<vector<float> > ppm(nspec, vector<float>(1, 0.));
@@ -52,6 +53,7 @@ int main(int argc, char *argv[]) {
         if (strcmp(keyword, "spectrum") == 0) {
             TD.push_back(1);
             MAS.push_back(0);
+            sat.push_back(0);
             vs.push_back(0.);
 
             sscanf(buffer, "%s %s %d %s", keyword, keyword, &TD[nspec], spec_file);
@@ -62,6 +64,9 @@ int main(int argc, char *argv[]) {
 
             if (strcmp(keyword, "MAS") == 0) {
                 MAS[nspec] = 1;
+            }
+            if (strcmp(keyword, "satellites") == 0) {
+                sat[nspec] = 1;
             }
 
             nspec++;
@@ -290,7 +295,7 @@ int main(int argc, char *argv[]) {
 
                 //Calculation of the total RMSD
                 for (k = 0; k < nspec; k++) {
-                    RMSD += spectrum_RMSD(TD[k], MAS[k],fast, sites, bin[k], ppm[k], diso, span, skew, chi, eta, S, vs[k], alpha, beta, gamma, LB[k], GB[k], width[k], intensity[k]);
+                    RMSD += spectrum_RMSD(TD[k], MAS[k],sat[k],fast, sites, bin[k], ppm[k], diso, span, skew, chi, eta, S, vs[k], alpha, beta, gamma, LB[k], GB[k], width[k], intensity[k]);
                 }
 
                 //Commands that are done when a better fit is found, namely all mean parameters are updated
@@ -326,7 +331,7 @@ int main(int argc, char *argv[]) {
                             fast=0;
                             RMSD = 0.;
                             for (k = 0; k < nspec; k++) {
-                                RMSD += spectrum_RMSD(TD[k], MAS[k],fast, sites, bin[k], ppm[k], diso, span, skew, chi, eta, S, vs[k], alpha, beta, gamma, LB[k], GB[k], width[k], intensity[k]);
+                                RMSD += spectrum_RMSD(TD[k], MAS[k],sat[k],fast, sites, bin[k], ppm[k], diso, span, skew, chi, eta, S, vs[k], alpha, beta, gamma, LB[k], GB[k], width[k], intensity[k]);
                             }
                             RMSD_log[1] = RMSD_min = RMSD;
                         }
@@ -362,7 +367,7 @@ int main(int argc, char *argv[]) {
                 fprintf(fp3, "%d,%f,%.1f,%.2f,%.2f,%.2f,%.2f,%.2f,%.0f,%.0f,%.0f,%.2f,%.2f,%.0f,%.0f,%.0f\n", j+1, RMSD_min, intensity[0][j] * 100., diso[j], chi[j] / 1e6, eta[j], span[j], skew[j], alpha[j] * 180. / Pi, beta[j] * 180. / Pi, gamma[j] * 180. / Pi,dani,etaCS,phi * 180. / Pi,chii * 180. / Pi,psi * 180. / Pi);
                 fclose(fp3);
                 //simulations are written in a separate CSV file.
-                write_fits(RMSD_min,nspec,TD,MAS,sites,bin,ppm,diso,span,skew,chi,eta,S,vs,alpha,beta,gamma,LB,GB,intensity,width);
+                write_fits(RMSD_min,nspec,TD,MAS,sat,sites,bin,ppm,diso,span,skew,chi,eta,S,vs,alpha,beta,gamma,LB,GB,intensity,width);
             }
             l++;
             if (l > tries) {

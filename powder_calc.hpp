@@ -26,6 +26,12 @@ float vQ_stat(float diso, float chi, float eta, float vs, float S, float ct, flo
     return diso - 9.e6 * chi * chi / (6. * vs * vs * (2. * S * (2. * S - 1.)) * (2. * S * (2. * S - 1.))) * (S * (S + 1.) - 0.75) * (A * pow(ct, 4.) + B * ct * ct + C);
 }
 
+float vQ_sat(float diso, float chi, float eta, float vs, float S, float m, float ct, float st, float c2p){
+    //returns the first order quadrupolar shift from the transition from m and m-1
+    float vQ = (1.-2.*m)*(3.*chi)/(4.*S*(2.*S-1.)) * (0.5*(3.*ct*ct-1) + 0.5*eta*st*st*c2p);
+    return diso + vQ*1.e6/vs;
+}
+
 float vCSA_stat(float d11, float d22, float d33, float ct, float st, float cp, float sp, float ca, float sa, float cb, float sb, float cg, float sg) {
     //This function returns the resonance frequency contribution to an isochromat from the CSA
     //variables cs and sa are the sine and cosine of the Euler angle alpha, etc.
@@ -442,7 +448,188 @@ void simulate_static(int TD, vector<float>& bin, vector<float>& ppm, float diso,
     free(freq);
 }
 
-float spectrum_RMSD(int TD, int MAS,int fast, int sites, vector<float>& bin, vector<float>& ppm, float* diso, float* span, float* skew, float* chi, float* eta, float S, float vs, float* alpha, float* beta, float* gamma,  vector<float>& LB, vector<float>& GB, float width,vector<float>& intensity) {
+void simulate_static_sat(int TD, vector<float>& bin, vector<float>& ppm, float diso, float span, float skew, float chi, float eta, float S, float vs, float alpha, float beta, float gamma, int fast) {
+    //function to calculate a static spectrum
+    int N = 32, i, j, k, v, quadrant;
+    float l, m, n, ct, st, cp, sp, R, f[3];
+    float spacing = ppm[1] - ppm[0];
+    int Np = N + 1;
+    float* freq;
+    freq = (float*)malloc(4 * Np * Np * sizeof(float));
+
+    float d22 = skew * span / 3. + diso;
+    float d33 = (3. * diso - d22 - span) / 2.;
+    float d11 = 3. * diso - d22 - d33;
+    float ca = cos(alpha);
+    float sa = sin(alpha);
+    float cb = cos(beta);
+    float sb = sin(beta);
+    float cg = cos(gamma);
+    float sg = sin(gamma);
+
+    float transition;
+    for(transition = S; transition > -S; transition--){
+    float moment = (S*(S+1.)-transition*(transition-1.));
+
+    for (j = 0; j <= N; j++) {
+        for (i = 0; (i + j) <= N; i++) {
+            for (quadrant = 0; quadrant < 4; quadrant++) {
+                k = N - abs(i) - abs(j);
+                l = abs(i) / sqrt(i * i + j * j + k * k);
+                m = abs(j) / sqrt(i * i + j * j + k * k);
+                n = k / sqrt(i * i + j * j + k * k);
+
+                ct = n;
+                st = sqrt(1. - n * n);
+
+                switch (quadrant) {
+                    case 0:
+                        cp = -l / st;
+                        sp = m / st;
+                        break;
+
+                    case 1:
+                        cp = -l / st;
+                        sp = -m / st;
+                        break;
+
+                    case 2:
+                        cp = l / st;
+                        sp = m / st;
+                        break;
+
+                    case 3:
+                        cp = l / st;
+                        sp = -m / st;
+                        break;
+                }
+
+                if (cp < -1.) {
+                    cp = -1;
+                }
+                if (cp > 1.) {
+                    cp = 1;
+                }
+                if (ct == 1.) {
+                    cp = 0.;
+                    st = 0.;
+                }
+                if (ct == 0.) {
+                    st = 1.;
+                }
+                if (cp == 1.) {
+                    sp = 0.;
+                }
+
+                float c2p = cp * cp - sp * sp;
+
+                if(transition==0.5)
+                    freq[quadrant * Np * Np + abs(i) * Np + abs(j)] = vQ_stat(diso, chi, eta, vs, S, ct, c2p) + vCSA_stat(d11, d22, d33, ct, st, cp, sp, ca, sa, cb, sb, cg, sg);
+                else
+                    freq[quadrant * Np * Np + abs(i) * Np + abs(j)] = vQ_sat(diso,chi,eta,vs,S,transition,ct,st,c2p) + vCSA_stat(d11, d22, d33, ct, st, cp, sp, ca, sa, cb, sb, cg, sg);
+            }
+        }
+    }
+    int a;
+    for (j = 1; j <= N; j++) {
+        for (i = 0; i <= (N - abs(j)); i++) {
+            int jump;
+            for (quadrant = 0; quadrant < 4; quadrant++) {
+                for (a = 0; a < 2; a++) {
+                    jump = 1;
+                    if (a == 0) {
+                        f[0] = freq[quadrant * Np * Np + Np * i + j];
+                        f[1] = freq[quadrant * Np * Np + Np * i + j - 1];
+                        f[2] = freq[quadrant * Np * Np + Np * (i + 1) + j - 1];
+                    }
+
+                    else if (a == 1 && (i + j) < (N)) {
+                        f[0] = freq[quadrant * Np * Np + Np * i + abs(j)];
+                        f[1] = freq[quadrant * Np * Np + Np * (i + 1) + j - 1];
+                        f[2] = freq[quadrant * Np * Np + Np * (i + 1) + j];
+                    } else
+                        jump = 0;
+
+                    k = N - (i) - (j);
+                    R = sqrt(i * i + j * j + k * k) / N;
+                    qsort(f, 3, sizeof(float), floatcomp);  // in ascending order
+
+                    if (jump) {
+                        int v1 = (int)((f[0] - ppm[0]) / spacing);
+                        int v3 = (int)((f[2] - ppm[0]) / spacing);
+                        int v2 = (int)((f[1] - ppm[0]) / spacing);
+                        int vstart = v1;
+                        int vend = v3;
+                        int vmid = v2;
+                        if (vstart < 0) {
+                            vstart = 0;
+                            v1 = -100e6;
+                        }
+                        if (vend > TD - 1) {
+                            vend = TD - 1;
+                            v3 = 100e6;
+                        }
+                        if (vmid < 0)
+                            vmid = 0;
+                        if (vmid > TD - 1)
+                            vmid = TD - 1;
+
+                        if(fast){
+                            for (v = vstart; v < vmid; v++) {
+                                bin[v] = bin[v] + moment*(v1!=v2)*(v3!=v1)* (float)(v - v1) / (v2 - v1) / (R * R * R * (v3 - v1));
+                            }
+                            for (v = vmid; v < vend; v++) {
+                                bin[v] = bin[v] + moment*(v3!=v2)*(v3!=v1)*(float)(v3 - v) / (v3 - v2) / (R * R * R * (v3 - v1));
+                            }
+                        }
+                        else{
+                            for (v=vstart; v<TD-1; v++){
+                                if((f[0]>ppm[TD-1]))
+                                    break;
+
+                                else if((f[2]<ppm[0]))
+                                    break;
+
+                                if((ppm[v]>f[0]) && (ppm[v+1]<=f[1])){
+                                    bin[v]=bin[v]+moment/(R*R*R)*((ppm[v+1]-ppm[v])*(ppm[v]+ppm[v+1]-2.0*f[0]))/((f[2]-f[0])*(f[1]-f[0]));
+                                }
+                                else if((ppm[v]<=f[0]) && (ppm[v+1]>f[0]) && (ppm[v+1]<=f[1])){
+                                    bin[v]=bin[v]+moment/(R*R*R)*((ppm[v+1]-f[0])*(ppm[v+1]-f[0]))/((f[2]-f[0])*(f[1]-f[0]));
+                                }
+                                else if((ppm[v]>f[1]) && (ppm[v]<=f[2]) && (ppm[v+1]>f[2])){
+                                    bin[v]=bin[v]+moment/(R*R*R)*((f[2]-ppm[v])*(f[2]-ppm[v]))/((f[2]-f[0])*(f[2]-f[1]));
+                                }
+                                else if((ppm[v]>f[0]) && (ppm[v]<=f[1]) && (ppm[v+1]>f[1]) && (ppm[v+1]<=f[2])){
+                                    bin[v]=bin[v]+moment/(R*R*R)*(((f[1]-ppm[v])*(f[1]+ppm[v]-2.0*f[0]))/((f[2]-f[0])*(f[1]-f[0]))+((ppm[v+1]-f[1])*(2.0*f[2]-ppm[v+1]-f[1]))/((f[2]-f[0])*(f[2]-f[1])));
+                                }
+                                else if((ppm[v]>f[0]) && (ppm[v]<=f[1]) && (ppm[v+1]>f[2])){
+                                bin[v]=bin[v]+moment/(R*R*R)*(((f[1]-ppm[v])*(f[1]+ppm[v]-2.0*f[0]))/((f[2]-f[0])*(f[1]-f[0]))+(f[2]-f[1])/(f[2]-f[0]));
+                                }
+                                else if((ppm[v]<=f[0]) && (ppm[v+1]>f[1]) && (ppm[v+1]<=f[2])){
+                                    bin[v]=bin[v]+moment/(R*R*R)*((f[1]-f[0])/(f[2]-f[0])+((ppm[v+1]-f[1])*(2.0*f[2]-ppm[v+1]-f[1]))/((f[2]-f[0])*(f[2]-f[1])));
+                                }
+                                else if((ppm[v]<=f[0]) && (ppm[v+1]>f[2])){
+                                    bin[v]=bin[v]+moment/(R*R*R);
+                                }
+                                else if((ppm[v]>f[1]) && (ppm[v+1]<=f[2])){
+                                    bin[v]=bin[v]+moment/(R*R*R)*((ppm[v+1]-ppm[v])*(2.0*f[2]-ppm[v+1]-ppm[v]))/((f[2]-f[0])*(f[2]-f[1]));
+                                }
+                                else
+                                    break;
+
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    }//transition loop
+    free(freq);
+}
+
+float spectrum_RMSD(int TD, int MAS, int sat, int fast, int sites, vector<float>& bin, vector<float>& ppm, float* diso, float* span, float* skew, float* chi, float* eta, float S, float vs, float* alpha, float* beta, float* gamma,  vector<float>& LB, vector<float>& GB, float width,vector<float>& intensity) {
     //Compares a simulation to the experiment and returns the RMSD
     //The spectrum simulation and broadening functions are applied within this function
     vector<float> bin_sim(TD, 0.);
@@ -453,6 +640,10 @@ float spectrum_RMSD(int TD, int MAS,int fast, int sites, vector<float>& bin, vec
     for (i = 0; i < sites; i++) {
         if (MAS) {
             simulate_MAS(TD, bin_temp, ppm, diso[i], chi[i], eta[i], S, vs,fast);
+            Broadening(LB[i], GB[i], bin_temp, width, TD);
+        }
+        else if(sat){
+            simulate_static_sat(TD, bin_temp, ppm, diso[i], span[i], skew[i], chi[i], eta[i], S, vs, alpha[i], beta[i], gamma[i],fast);
             Broadening(LB[i], GB[i], bin_temp, width, TD);
         }
         else {
@@ -469,7 +660,7 @@ float spectrum_RMSD(int TD, int MAS,int fast, int sites, vector<float>& bin, vec
     return 1000. * sqrt(RMSD) / TD;
 }
 
-void write_fits(float RMSD_min, int nspec, vector<int>& TD, vector<int>& MAS, int sites,  vector< vector<float> >& bin,  vector< vector<float> >& ppm, float* diso, float* span, float* skew, float* chi, float* eta, float S, vector<float>& vs, float* alpha, float* beta, float* gamma,vector< vector<float> >& LB,vector< vector<float> >& GB,vector< vector<float> >& intensity, float* width){
+void write_fits(float RMSD_min, int nspec, vector<int>& TD, vector<int>& MAS, vector<int>& sat, int sites,  vector< vector<float> >& bin,  vector< vector<float> >& ppm, float* diso, float* span, float* skew, float* chi, float* eta, float S, vector<float>& vs, float* alpha, float* beta, float* gamma,vector< vector<float> >& LB,vector< vector<float> >& GB,vector< vector<float> >& intensity, float* width){
     //This function creates a comma-delimited file with the experimental spectra and their simulations
     //These can be plotted in a spreadsheet program to assess the quality of the fit
     int i, j, k, TDmax=0;
@@ -490,6 +681,10 @@ void write_fits(float RMSD_min, int nspec, vector<int>& TD, vector<int>& MAS, in
         for (j = 0; j < sites; j++) {
             if (MAS[i]) {
                 simulate_MAS(TD[i], bin_temp[i], ppm[i], diso[j], chi[j], eta[j], S, vs[i],0);
+                Broadening(LB[i][j], GB[i][j], bin_temp[i], width[i], TD[i]);
+            }
+            else if (sat[i]) {
+                simulate_static_sat(TD[i], bin_temp[i], ppm[i], diso[j], span[j], skew[j], chi[j], eta[j], S, vs[i], alpha[j], beta[j], gamma[j],0);
                 Broadening(LB[i][j], GB[i][j], bin_temp[i], width[i], TD[i]);
             }
             else {
