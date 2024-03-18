@@ -73,10 +73,32 @@ void Calculate_DMFIT_angles(float alpha, float beta, float gamma, float skew, fl
         float R13=  -sin(beta)*cos(gamma);
         float R33= cos(beta);
 
-        chi=acos(R13);
-        psi=-asin(R12/sin(chi))+Pi/2.;
-        phi=-acos(-1.*R33/sin(chi));
-        chi*=-1;
+        chi=-acos(R13);
+        psi=-asin(-1.*R12/sin(chi))+Pi/2.;
+        phi=-acos(R33/sin(chi));
     }
     Fix_Angles(phi,chi,psi);
+}
+
+void Calculate_WSolids_angles(float &alpha, float &beta, float &gamma, float skew, float phi, float chi, float psi){
+
+     if(skew>=0.){
+        alpha = Pi/2.-psi;
+        beta=-1.*chi;
+        gamma = -1.*phi;
+    }
+
+    else{
+        float R12= sin(Pi/2.-psi)*cos(-chi)*cos(-phi) + cos(Pi/2.-psi)*sin(-phi);
+        float R13=  -sin(-chi)*cos(-phi);
+        float R23=sin(chi)*sin(phi);
+        beta=-acos(R13);
+        gamma=-asin(R23/sin(beta));
+        alpha=asin(-1.*R12/sin(beta));
+
+        if(psi>Pi/2.)
+            gamma=asin(R23/sin(beta));
+
+    }
+    Fix_Angles(alpha,beta,gamma);
 }
