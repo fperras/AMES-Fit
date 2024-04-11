@@ -8,8 +8,8 @@ Using a Ccmd (command prompt) window, cd into this directory and run the program
 AMES-Fit.exe input_filename
 
 **Unix**
-No biraries are provided for a UNIX-like environment (Mac or Linux) but these can be created by compiling the program with the command:
-g++ AMES-Fit.cpp -o AMES-Fit -fopenmp -lm -O3 -march=native
+No biraries are provided for a UNIX-like environment (Mac or Linux) but these can be created by compiling the program with the command (assuming GSL is installed):
+g++ AMES-Fit.cpp -o AMES-Fit -fopenmp -lgsl -lgslcblas -lm -O3 -march=native
 
 And then run in the terminal (or schedular, such as SLURM) with the command:
 
