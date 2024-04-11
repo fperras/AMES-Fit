@@ -1,5 +1,6 @@
 steps      1000
 max_steps 20000
+simplex   10000
 rate        0.5
 tries        64 
 
