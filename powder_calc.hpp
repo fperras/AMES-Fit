@@ -1,4 +1,5 @@
 #include <time.h>
+#include <math.h>
 #include <vector>
 #include "FastExp.h"
 #include <gsl/gsl_multimin.h>
@@ -880,6 +881,11 @@ double total_RMSD(const gsl_vector* var, void* params){
     vector<vector<float> > intensity(nspec,vector<float>(sites, 0.));
 
     disentangle_variables(var,nspec,sites,diso,span,skew,chi,eta,alpha,beta,gamma,LB,GB,intensity);
+
+    for(k=0;k<sites;k++){
+        if((fabs(skew[k])>1.)||(eta[k]>1.0)||(eta[k]<0.0)||(span[k]<0.0))
+            return 1000000000000.;
+    }
 
     float RMSD = 0.;
      for (k = 0; k < nspec; k++) {
