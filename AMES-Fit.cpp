@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
     //Variable declarations
     FILE *in, *error;
     char input_file[128], buffer[256], keyword[64], spec_file[128];
-    int l, sites = 0, nspec = 0, steps = 200, max_steps = 100000, tries = 8, simplex=0;
+    int l, sites = 0, nspec = 0, steps = 200, max_steps = 100000, tries = 8, simplex=1000;
     float rate = 0.5, S=1.5;
     vector<int> TD;
     vector<int> MAS;
