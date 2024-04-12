@@ -1,5 +1,6 @@
 04/11/2024
     Added the option of doing a final optimization using a simplex algorithm.
     The minimization algorithm is from the GNU Scientific Library (GSL)
-    To use this option, add the keyword 'simplex' to the input file 
-    followed by the maximum number of steps you wish it to take, ex: "simplex 10000"
+    To use control this step, add the keyword 'simplex' to the input file 
+    followed by the maximum number of steps you wish it to take, ex: "simplex 10000".
+    The default value is 1000.
