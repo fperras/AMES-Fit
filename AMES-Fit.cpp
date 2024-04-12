@@ -243,8 +243,8 @@ int main(int argc, char *argv[]) {
             vector<vector<float> > intensity(nspec,vector<float>(sites, 0.));
 
             gsl_vector *ss, *var;
-            var = gsl_vector_alloc (8*sites+8*3*nspec);
-            ss = gsl_vector_alloc (8*sites+8*3*nspec);
+            var = gsl_vector_alloc (8*sites+sites*3*nspec);
+            ss = gsl_vector_alloc (8*sites+sites*3*nspec);
             struct par parameters;
             create_params(&parameters, nspec, TD, MAS, sat, 1, sites, bin, ppm, S, vs, width);
 
@@ -361,7 +361,7 @@ int main(int argc, char *argv[]) {
             const gsl_multimin_fminimizer_type *T =  gsl_multimin_fminimizer_nmsimplex2;
             gsl_multimin_fminimizer *s = NULL;
             gsl_multimin_function minex_func;
-            minex_func.n = 8*sites+8*3*nspec;
+            minex_func.n = 8*sites+sites*3*nspec;
             minex_func.f = total_RMSD; //function assignment
             minex_func.params = &parameters; //parameter assignment
             set_step_size(var,ss,sites,nspec);
